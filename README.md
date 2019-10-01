@@ -8,4 +8,4 @@ Using wasm-bindgen/js-sys/web-sys
 
 Renders a single square
 
-[Try it here](finegeometer.github.io/webvr-test)
+[Try it here](https://finegeometer.github.io/webvr-test)
