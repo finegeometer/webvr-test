@@ -49,7 +49,6 @@ fn self_referential_function<T: 'static + wasm_bindgen::convert::FromWasmAbi>(
 #[wasm_bindgen]
 pub fn run() -> Result<(), JsValue> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    web_sys::console::log_1(&"Test Count: 9".into()); // Increment on each test, so I know when GH pages updates.
 
     let window = web_sys::window().ok_or("no global `window` exists")?;
     let document = window
@@ -234,7 +233,7 @@ uniform mat4 view;
 
 void main() {
     vpos = pos;
-    gl_Position = projection * view * vec4(pos, 3.0, 1.0);
+    gl_Position = projection * view * vec4(pos, 0.0, 1.0);
 }
 
 "#;
