@@ -107,6 +107,7 @@ pub fn run() -> Result<(), JsValue> {
     gl.vertex_attrib_pointer_with_i32(pos_loc, 2, GL::FLOAT, false, 2 * 4, 0);
 
     let render_function = std::rc::Rc::new(move || -> std::result::Result<(), JsValue> {
+        web_sys::console::log_1(&"enter c1".into());
         gl.clear_color(0., 0., 0., 1.);
         gl.clear(GL::COLOR_BUFFER_BIT);
 
@@ -127,6 +128,7 @@ pub fn run() -> Result<(), JsValue> {
         gl.viewport(400, 0, 800, 800);
         gl.draw_arrays(GL::TRIANGLES, 0, 6);
 
+        web_sys::console::log_1(&"exit c1".into());
         Ok(())
     });
 
@@ -134,11 +136,10 @@ pub fn run() -> Result<(), JsValue> {
 
     let navigator: web_sys::Navigator = window.navigator();
 
-    web_sys::console::log_1(&navigator);
-
     navigator
         .get_vr_displays()?
         .then(&to_js_closure(move |vr_displays: JsValue| {
+            web_sys::console::log_1(&"enter c2".into());
             let render_function = render_function.clone();
 
             let vr_displays: js_sys::Array = js_sys::Array::from(&vr_displays);
@@ -154,6 +155,7 @@ pub fn run() -> Result<(), JsValue> {
             canvas.clone().add_event_listener_with_callback(
                 "mousedown",
                 &self_referential_function(move |this_function, _evt: web_sys::MouseEvent| {
+                    web_sys::console::log_1(&"enter c3".into());
                     let render_function = render_function.clone();
 
                     canvas.remove_event_listener_with_callback("mousedown", &this_function)?;
@@ -170,11 +172,13 @@ pub fn run() -> Result<(), JsValue> {
                         .clone()
                         .request_present(&layers)?
                         .then(&to_js_closure(move |_| {
+                            web_sys::console::log_1(&"enter c4".into());
                             let render_function = render_function.clone();
 
                             vr_display.clone().request_animation_frame(
                                 &self_referential_function(
                                     move |this_function, _timestamp: f64| {
+                                        web_sys::console::log_1(&"enter c5".into());
                                         vr_display.request_animation_frame(&this_function)?;
 
                                         render_function()?;
