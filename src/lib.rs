@@ -49,7 +49,7 @@ fn self_referential_function<T: 'static + wasm_bindgen::convert::FromWasmAbi>(
 #[wasm_bindgen]
 pub fn run() -> Result<(), JsValue> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    web_sys::console::log_1(&"Test Count: 7".into()); // Increment on each test, so I know when GH pages updates.
+    web_sys::console::log_1(&"Test Count: 8".into()); // Increment on each test, so I know when GH pages updates.
 
     let window = web_sys::window().ok_or("no global `window` exists")?;
     let document = window
@@ -96,6 +96,12 @@ pub fn run() -> Result<(), JsValue> {
     }
 
     let pos_loc = gl.get_attrib_location(&program, "pos") as u32;
+    let projection_loc = gl
+        .get_uniform_location(&program, "projection")
+        .ok_or("Could not find uniform")?;
+    let view_loc = gl
+        .get_uniform_location(&program, "view")
+        .ok_or("Could not find uniform")?;
 
     let vao = gl
         .create_vertex_array()
@@ -107,29 +113,36 @@ pub fn run() -> Result<(), JsValue> {
     gl.enable_vertex_attrib_array(pos_loc);
     gl.vertex_attrib_pointer_with_i32(pos_loc, 2, GL::FLOAT, false, 2 * 4, 0);
 
-    let render_function = std::rc::Rc::new(move || -> std::result::Result<(), JsValue> {
-        gl.clear_color(0., 0., 0., 1.);
-        gl.clear(GL::COLOR_BUFFER_BIT);
+    let render_function = std::rc::Rc::new(
+        move |uniforms: [(Vec<f32>, Vec<f32>); 2]| -> std::result::Result<(), JsValue> {
+            gl.clear_color(0., 0., 0., 1.);
+            gl.clear(GL::COLOR_BUFFER_BIT);
 
-        gl.bind_vertex_array(Some(&vao));
+            gl.bind_vertex_array(Some(&vao));
 
-        gl.bind_buffer(GL::ARRAY_BUFFER, Some(&vertex_buffer));
-        gl.buffer_data_with_array_buffer_view(
-            GL::ARRAY_BUFFER,
-            &as_f32_array(&[0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0])?.into(),
-            GL::STATIC_DRAW,
-        );
+            gl.bind_buffer(GL::ARRAY_BUFFER, Some(&vertex_buffer));
+            gl.buffer_data_with_array_buffer_view(
+                GL::ARRAY_BUFFER,
+                &as_f32_array(&[0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0])?
+                    .into(),
+                GL::STATIC_DRAW,
+            );
 
-        gl.use_program(Some(&program));
+            gl.use_program(Some(&program));
 
-        gl.viewport(0, 0, 400, 800);
-        gl.draw_arrays(GL::TRIANGLES, 0, 6);
+            gl.viewport(0, 0, 400, 800);
+            gl.uniform_matrix4fv_with_f32_array(Some(&projection_loc), false, &uniforms[0].0);
+            gl.uniform_matrix4fv_with_f32_array(Some(&view_loc), false, &uniforms[0].1);
+            gl.draw_arrays(GL::TRIANGLES, 0, 6);
 
-        gl.viewport(400, 0, 400, 800);
-        gl.draw_arrays(GL::TRIANGLES, 0, 6);
+            gl.viewport(400, 0, 400, 800);
+            gl.uniform_matrix4fv_with_f32_array(Some(&projection_loc), false, &uniforms[1].0);
+            gl.uniform_matrix4fv_with_f32_array(Some(&view_loc), false, &uniforms[1].1);
+            gl.draw_arrays(GL::TRIANGLES, 0, 6);
 
-        Ok(())
-    });
+            Ok(())
+        },
+    );
 
     //
 
@@ -164,8 +177,11 @@ pub fn run() -> Result<(), JsValue> {
 
                 let vr_display = vr_display.clone();
                 let vr_display_2 = vr_display.clone();
+
                 let closure = to_js_closure(move |_| {
                     let render_function = render_function.clone();
+
+                    let frame_data = web_sys::VrFrameData::new()?;
 
                     vr_display
                         .clone()
@@ -173,7 +189,18 @@ pub fn run() -> Result<(), JsValue> {
                             move |this_function, _timestamp: f64| {
                                 vr_display.request_animation_frame(&this_function)?;
 
-                                render_function()?;
+                                vr_display.get_frame_data(&frame_data);
+
+                                render_function([
+                                    (
+                                        frame_data.left_projection_matrix()?,
+                                        frame_data.left_view_matrix()?,
+                                    ),
+                                    (
+                                        frame_data.right_projection_matrix()?,
+                                        frame_data.right_view_matrix()?,
+                                    ),
+                                ])?;
 
                                 vr_display.submit_frame();
 
@@ -202,9 +229,12 @@ const VERTEX_SHADER: &str = r#"#version 300 es
 in vec2 pos;
 out vec2 vpos;
 
+uniform mat4 projection;
+uniform mat4 view;
+
 void main() {
     vpos = pos;
-    gl_Position = vec4(pos, 0.0, 1.0);
+    gl_Position = projection * view * vec4(pos, 3.0, 1.0);
 }
 
 "#;
@@ -213,7 +243,7 @@ const FRAGMENT_SHADER: &str = r#"#version 300 es
 
 precision mediump float;
 
-in vec2 vpos;
+in vec4 vpos;
 out vec4 color;
 
 void main() {
