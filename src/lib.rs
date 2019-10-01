@@ -3,13 +3,15 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
+/// Turn a FnOnce into a JS Closure, turning errors into thrown exceptions.
 fn to_js_closure(
     f: impl FnOnce(JsValue) -> Result<(), JsValue> + 'static,
 ) -> Closure<dyn FnMut(JsValue)> {
     Closure::once(|val| f(val).unwrap_throw())
 }
 
-/// Returns `|t| f(f, t)` as a JS function.
+/// Given function f, returns `|t| f(f, t)` as a JS function.
+/// This is useful if you want an event listener to remove itself, or request_animation_frame to call itself.
 fn self_referential_function<T: 'static + wasm_bindgen::convert::FromWasmAbi>(
     mut f: impl FnMut(js_sys::Function, T) -> Result<(), JsValue> + 'static,
 ) -> js_sys::Function {
@@ -63,7 +65,7 @@ pub fn run() -> Result<(), JsValue> {
     canvas.set_attribute("height", "800")?;
     body.append_child(&canvas)?;
 
-    //
+    // Set up the WebGL stuff.
 
     type GL = web_sys::WebGl2RenderingContext;
 
@@ -143,7 +145,7 @@ pub fn run() -> Result<(), JsValue> {
         },
     );
 
-    //
+    // VR stuff starts here.
 
     let navigator: web_sys::Navigator = window.navigator();
 
@@ -151,23 +153,21 @@ pub fn run() -> Result<(), JsValue> {
         let render_function = render_function.clone();
 
         let vr_displays: js_sys::Array = js_sys::Array::from(&vr_displays);
-        //
+
         if vr_displays.length() == 0 {
-            return Err("No VR display".into());
+            return Err("No VR display found".into());
         }
 
         let vr_display: web_sys::VrDisplay = vr_displays.get(0).dyn_into()?;
 
-        //
-
+        // Wait for you to click on the screen
+        // VR must be requested by an input event
         canvas.clone().add_event_listener_with_callback(
             "mousedown",
             &self_referential_function(move |this_function, _evt: web_sys::MouseEvent| {
                 let render_function = render_function.clone();
 
                 canvas.remove_event_listener_with_callback("mousedown", &this_function)?;
-
-                canvas.request_pointer_lock();
 
                 let mut layer = web_sys::VrLayer::new();
                 layer.source(Some(&canvas));
@@ -182,6 +182,7 @@ pub fn run() -> Result<(), JsValue> {
 
                     let frame_data = web_sys::VrFrameData::new()?;
 
+                    // Render loop starts here
                     vr_display
                         .clone()
                         .request_animation_frame(&self_referential_function(
