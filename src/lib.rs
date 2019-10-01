@@ -81,19 +81,18 @@ pub fn run() -> Result<(), JsValue> {
         gl.shader_source(&vertex_shader, VERTEX_SHADER);
         gl.compile_shader(&vertex_shader);
         gl.attach_shader(&program, &vertex_shader);
-        gl.delete_shader(Some(&vertex_shader));
-    }
-    {
+
         let fragment_shader = gl
             .create_shader(GL::FRAGMENT_SHADER)
             .ok_or("Could not create shader")?;
         gl.shader_source(&fragment_shader, FRAGMENT_SHADER);
         gl.compile_shader(&fragment_shader);
         gl.attach_shader(&program, &fragment_shader);
+
+        gl.link_program(&program);
+        gl.delete_shader(Some(&vertex_shader));
         gl.delete_shader(Some(&fragment_shader));
     }
-
-    gl.link_program(&program);
 
     let pos_loc = gl.get_attrib_location(&program, "pos") as u32;
 
@@ -207,11 +206,13 @@ void main() {
 
 const FRAGMENT_SHADER: &str = r#"#version 300 es
 
+precision mediump float;
+
 in vec2 vpos;
 out vec4 color;
 
 void main() {
-    color = vec4(pos, 0.0, 1.0);
+    color = vec4(vpos, 0.0, 1.0);
 }
 
 "#;
