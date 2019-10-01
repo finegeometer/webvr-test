@@ -49,7 +49,7 @@ fn self_referential_function<T: 'static + wasm_bindgen::convert::FromWasmAbi>(
 #[wasm_bindgen]
 pub fn run() -> Result<(), JsValue> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    web_sys::console::log_1(&"Test Count: 4".into()); // Increment on each test, so I know when GH pages updates.
+    web_sys::console::log_1(&"Test Count: 5".into()); // Increment on each test, so I know when GH pages updates.
 
     let window = web_sys::window().ok_or("no global `window` exists")?;
     let document = window
@@ -108,7 +108,6 @@ pub fn run() -> Result<(), JsValue> {
     gl.vertex_attrib_pointer_with_i32(pos_loc, 2, GL::FLOAT, false, 2 * 4, 0);
 
     let render_function = std::rc::Rc::new(move || -> std::result::Result<(), JsValue> {
-        web_sys::console::log_1(&"enter c1".into());
         gl.clear_color(0., 0., 0., 1.);
         gl.clear(GL::COLOR_BUFFER_BIT);
 
@@ -129,7 +128,6 @@ pub fn run() -> Result<(), JsValue> {
         gl.viewport(400, 0, 800, 800);
         gl.draw_arrays(GL::TRIANGLES, 0, 6);
 
-        web_sys::console::log_1(&"exit c1".into());
         Ok(())
     });
 
@@ -138,8 +136,9 @@ pub fn run() -> Result<(), JsValue> {
     let navigator: web_sys::Navigator = window.navigator();
 
     let closure = to_js_closure(move |vr_displays: JsValue| {
-        web_sys::console::log_1(&"enter c2".into());
         let render_function = render_function.clone();
+
+        web_sys::console::log_1(&vr_displays);
 
         let vr_displays: js_sys::Array = js_sys::Array::from(&vr_displays);
         //
@@ -154,7 +153,6 @@ pub fn run() -> Result<(), JsValue> {
         canvas.clone().add_event_listener_with_callback(
             "mousedown",
             &self_referential_function(move |this_function, _evt: web_sys::MouseEvent| {
-                web_sys::console::log_1(&"enter c3".into());
                 let render_function = render_function.clone();
 
                 canvas.remove_event_listener_with_callback("mousedown", &this_function)?;
@@ -169,14 +167,12 @@ pub fn run() -> Result<(), JsValue> {
                 let vr_display = vr_display.clone();
                 let vr_display_2 = vr_display.clone();
                 let closure = to_js_closure(move |_| {
-                    web_sys::console::log_1(&"enter c4".into());
                     let render_function = render_function.clone();
 
                     vr_display
                         .clone()
                         .request_animation_frame(&self_referential_function(
                             move |this_function, _timestamp: f64| {
-                                web_sys::console::log_1(&"enter c5".into());
                                 vr_display.request_animation_frame(&this_function)?;
 
                                 render_function()?;
@@ -195,7 +191,6 @@ pub fn run() -> Result<(), JsValue> {
         )
     });
 
-    web_sys::console::log_1(&"about to enter".into());
     navigator.get_vr_displays()?.then(&closure);
     closure.forget();
 
