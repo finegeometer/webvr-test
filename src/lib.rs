@@ -49,7 +49,7 @@ fn self_referential_function<T: 'static + wasm_bindgen::convert::FromWasmAbi>(
 #[wasm_bindgen]
 pub fn run() -> Result<(), JsValue> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    web_sys::console::log_1(&"Test Count: 2".into()); // Increment on each test, so I know when GH pages updates.
+    web_sys::console::log_1(&"Test Count: 4".into()); // Increment on each test, so I know when GH pages updates.
 
     let window = web_sys::window().ok_or("no global `window` exists")?;
     let document = window
@@ -137,64 +137,68 @@ pub fn run() -> Result<(), JsValue> {
 
     let navigator: web_sys::Navigator = window.navigator();
 
-    web_sys::console::log_1(&"about to enter".into());
-    navigator
-        .get_vr_displays()?
-        .then(&to_js_closure(move |vr_displays: JsValue| {
-            web_sys::console::log_1(&"enter c2".into());
-            let render_function = render_function.clone();
+    let closure = to_js_closure(move |vr_displays: JsValue| {
+        web_sys::console::log_1(&"enter c2".into());
+        let render_function = render_function.clone();
 
-            let vr_displays: js_sys::Array = js_sys::Array::from(&vr_displays);
-            //
-            if vr_displays.length() == 0 {
-                return Err("No VR display".into());
-            }
+        let vr_displays: js_sys::Array = js_sys::Array::from(&vr_displays);
+        //
+        if vr_displays.length() == 0 {
+            return Err("No VR display".into());
+        }
 
-            let vr_display: web_sys::VrDisplay = vr_displays.get(0).dyn_into()?;
+        let vr_display: web_sys::VrDisplay = vr_displays.get(0).dyn_into()?;
 
-            //
+        //
 
-            canvas.clone().add_event_listener_with_callback(
-                "mousedown",
-                &self_referential_function(move |this_function, _evt: web_sys::MouseEvent| {
-                    web_sys::console::log_1(&"enter c3".into());
+        canvas.clone().add_event_listener_with_callback(
+            "mousedown",
+            &self_referential_function(move |this_function, _evt: web_sys::MouseEvent| {
+                web_sys::console::log_1(&"enter c3".into());
+                let render_function = render_function.clone();
+
+                canvas.remove_event_listener_with_callback("mousedown", &this_function)?;
+
+                canvas.request_pointer_lock();
+
+                let mut layer = web_sys::VrLayer::new();
+                layer.source(Some(&canvas));
+                let layers = js_sys::Array::new();
+                layers.set(0, layer.as_ref().clone());
+
+                let vr_display = vr_display.clone();
+                let vr_display_2 = vr_display.clone();
+                let closure = to_js_closure(move |_| {
+                    web_sys::console::log_1(&"enter c4".into());
                     let render_function = render_function.clone();
 
-                    canvas.remove_event_listener_with_callback("mousedown", &this_function)?;
-
-                    canvas.request_pointer_lock();
-
-                    let mut layer = web_sys::VrLayer::new();
-                    layer.source(Some(&canvas));
-                    let layers = js_sys::Array::new();
-                    layers.set(0, layer.as_ref().clone());
-
-                    let vr_display = vr_display.clone();
                     vr_display
                         .clone()
-                        .request_present(&layers)?
-                        .then(&to_js_closure(move |_| {
-                            web_sys::console::log_1(&"enter c4".into());
-                            let render_function = render_function.clone();
+                        .request_animation_frame(&self_referential_function(
+                            move |this_function, _timestamp: f64| {
+                                web_sys::console::log_1(&"enter c5".into());
+                                vr_display.request_animation_frame(&this_function)?;
 
-                            vr_display.clone().request_animation_frame(
-                                &self_referential_function(
-                                    move |this_function, _timestamp: f64| {
-                                        web_sys::console::log_1(&"enter c5".into());
-                                        vr_display.request_animation_frame(&this_function)?;
+                                render_function()?;
 
-                                        render_function()?;
-
-                                        Ok(())
-                                    },
-                                ),
-                            )?;
-                            Ok(())
-                        }));
+                                Ok(())
+                            },
+                        ))?;
                     Ok(())
-                }),
-            )
-        }));
+                });
+
+                vr_display_2.request_present(&layers)?.then(&closure);
+                closure.forget();
+
+                Ok(())
+            }),
+        )
+    });
+
+    web_sys::console::log_1(&"about to enter".into());
+    navigator.get_vr_displays()?.then(&closure);
+    closure.forget();
+
     Ok(())
 }
 
