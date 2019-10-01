@@ -49,7 +49,7 @@ fn self_referential_function<T: 'static + wasm_bindgen::convert::FromWasmAbi>(
 #[wasm_bindgen]
 pub fn run() -> Result<(), JsValue> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    web_sys::console::log_1(&"Test Count: 6".into()); // Increment on each test, so I know when GH pages updates.
+    web_sys::console::log_1(&"Test Count: 7".into()); // Increment on each test, so I know when GH pages updates.
 
     let window = web_sys::window().ok_or("no global `window` exists")?;
     let document = window
@@ -125,7 +125,7 @@ pub fn run() -> Result<(), JsValue> {
         gl.viewport(0, 0, 400, 800);
         gl.draw_arrays(GL::TRIANGLES, 0, 6);
 
-        gl.viewport(400, 0, 800, 800);
+        gl.viewport(400, 0, 400, 800);
         gl.draw_arrays(GL::TRIANGLES, 0, 6);
 
         Ok(())
@@ -137,8 +137,6 @@ pub fn run() -> Result<(), JsValue> {
 
     let closure = to_js_closure(move |vr_displays: JsValue| {
         let render_function = render_function.clone();
-
-        web_sys::console::log_1(&vr_displays);
 
         let vr_displays: js_sys::Array = js_sys::Array::from(&vr_displays);
         //
